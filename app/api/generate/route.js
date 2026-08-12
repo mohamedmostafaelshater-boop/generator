@@ -1,45 +1,46 @@
 export async function POST(request) {
-  try {
-    const { name, features, tone, lang } = await request.json();
+  const { name, features, tone, lang } = await request.json();
 
-    if (!name || typeof name !== "string") {
-      return Response.json({ error: "Product name is required" }, { status: 400 });
-    }
+  if (!name || typeof name !== "string") {
+    return Response.json({ error: "Product name is required" }, { status: 400 });
+  }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      return Response.json(
-        { error: "Server is missing ANTHROPIC_API_KEY" },
-        { status: 500 }
-      );
-    }
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return Response.json(
+      { error: "Server is missing ANTHROPIC_API_KEY" },
+      { status: 500 }
+    );
+  }
 
-    const toneLabels = {
-      ar: { premium: "فاخر", friendly: "ودّي", punchy: "مباشر" },
-      en: { premium: "Premium", friendly: "Friendly", punchy: "Punchy" },
-    };
-    const toneLabel =
-      (toneLabels[lang] && toneLabels[lang][tone]) || toneLabels.ar.friendly;
+  const toneLabels = {
+    ar: { premium: "فاخر", friendly: "ودّي", punchy: "مقنع وقوي" },
+    en: { premium: "Premium", friendly: "Friendly", punchy: "Punchy" },
+  };
 
-    const prompt =
-      lang === "en"
-        ? `You are a professional e-commerce copywriter.
-Write an engaging product description in English, in a "${toneLabel}" tone.
+  const toneLabel =
+    (toneLabels[lang] && toneLabels[lang][tone]) || tone || "Friendly";
+
+  let prompt;
+  if (lang === "en") {
+    prompt = `You are a professional e-commerce copywriter. Write an engaging social media caption in English, in a ${toneLabel} tone, for the following product.
 
 Product name: ${name}
-Specs/details: ${features || "not specified, infer from the product name"}
+Details: ${features || "not specified, infer from the name"}
 
-Respond in JSON only, no preamble, no backticks, in exactly this shape:
-{"headline": "short catchy headline (5-8 words)", "description": "product description (3-4 sentences, persuasive and clear)", "bullets": ["feature 1", "feature 2", "feature 3"], "seo_tags": ["tag1", "tag2", "tag3", "tag4"]}`
-        : `أنت كاتب محتوى تسويقي محترف متخصص في التجارة الإلكترونية العربية.
-اكتب وصف منتج جذاب باللغة العربية الفصحى المبسطة، بأسلوب "${toneLabel}".
+Return JSON only, no preamble, no backticks, in this exact shape:
+{"caption": "short catchy caption (2-3 sentences)", "hashtags": "5 relevant hashtags separated by spaces"}`;
+  } else {
+    prompt = `أنت كاتب محتوى تسويقي محترف في التجارة الإلكترونية. اكتب تعليق (كابشن) جذاب لمنصات التواصل الاجتماعي باللغة العربية الفصحى، بأسلوب ${toneLabel}، للمنتج التالي.
 
 اسم المنتج: ${name}
-المواصفات/التفاصيل: ${features || "غير محددة، استنتج بناءً على اسم المنتج"}
+التفاصيل: ${features || "غير محددة، استنتج بناءً على اسم المنتج"}
 
-المطلوب: أعد الرد بصيغة JSON فقط، بدون أي مقدمة أو نص إضافي أو علامات backticks، بالشكل التالي بالضبط:
-{"headline": "عنوان قصير جذاب (5-8 كلمات)", "description": "وصف المنتج (3-4 جمل، مقنع وواضح)", "bullets": ["ميزة 1", "ميزة 2", "ميزة 3"], "seo_tags": ["كلمة1", "كلمة2", "كلمة3", "كلمة4"]}`;
+أرجع بيانات JSON فقط، بدون أي مقدمة أو نص إضافي أو علامات JSON: بالشكل التالي بالضبط:
+{"caption": "تعليق قصير جذاب (2-3 جمل)", "hashtags": "5 هاشتاجات مناسبة مفصولة بمسافات"}`;
+  }
 
+  try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -57,8 +58,8 @@ Respond in JSON only, no preamble, no backticks, in exactly this shape:
     if (!response.ok) {
       const errText = await response.text();
       return Response.json(
-        { error: "Anthropic API request failed", details: errText },
-        { status: response.status }
+        { error: "Anthropic API request failed", details: errText, status: response.status },
+        { status: 500 }
       );
     }
 
@@ -77,4 +78,5 @@ Respond in JSON only, no preamble, no backticks, in exactly this shape:
       { error: "Unexpected server error", details: String(err) },
       { status: 500 }
     );
-        }
+  }
+}
